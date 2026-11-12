@@ -96,4 +96,6 @@ Aplikasi dashboard akan otomatis terbuka pada peramban web (browser) Anda di ala
 
 ## 🌐 Tautan Dashboard Streamlit Cloud
 
-Tautan dashboard daring yang telah dipublikasikan dapat diakses melalui berkas `url.txt`.
+Dashboard interaktif yang telah dipublikasikan dapat diakses secara daring melalui tautan berikut:
+👉 **[Live Streamlit Dashboard](https://dashboard-hauzanziyadatulkhoir-ds001b6y0726.streamlit.app/)**
+*(Tautan ini juga tercantum di dalam berkas `url.txt`).*
