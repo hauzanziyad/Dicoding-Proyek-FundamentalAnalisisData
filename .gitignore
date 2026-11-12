@@ -17,5 +17,7 @@ __pycache__/
 # Submission archives (large files)
 *.zip
 
-# Raw dataset if not needed in repo root (dashboard uses dashboard/main_data.csv)
+# Raw dataset (large files, not needed on GitHub because dashboard uses dashboard/main_data.csv)
+data/
 E-Commerce Public Dataset/
+submission/
