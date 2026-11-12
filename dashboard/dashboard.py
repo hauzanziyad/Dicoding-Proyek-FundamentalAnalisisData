@@ -68,10 +68,20 @@ with st.sidebar:
         max_value=max_date
     )
     
-    if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
-        start_date, end_date = date_range
+    if isinstance(date_range, (tuple, list)):
+        if len(date_range) == 2:
+            start_date, end_date = date_range
+        elif len(date_range) == 1:
+            st.info("ℹ️ Silakan tentukan tanggal akhir (end date) pada kalender untuk menyelesaikan filter.")
+            st.stop()
+        else:
+            start_date, end_date = default_start, default_end
     else:
         start_date, end_date = default_start, default_end
+        
+    if start_date > end_date:
+        st.error("⚠️ Tanggal awal tidak boleh lebih besar dari tanggal akhir.")
+        st.stop()
     
     # State Filter
     all_states = sorted(df_raw['customer_state'].dropna().unique())
@@ -94,6 +104,11 @@ filtered_df = df_raw[
     (df_raw['order_purchase_timestamp'].dt.date <= end_date) &
     (df_raw['customer_state'].isin(selected_states))
 ]
+
+# Guard against empty filtered dataset
+if filtered_df.empty:
+    st.warning("⚠️ Tidak ada data transaksi yang ditemukan untuk rentang tanggal dan negara bagian yang dipilih. Silakan sesuaikan kembali filter Anda pada sidebar.")
+    st.stop()
 
 # Header Section
 st.markdown('<div class="main-header">🛍️ Brazilian E-Commerce Performance & Customer Satisfaction Dashboard</div>', unsafe_allow_html=True)
@@ -148,17 +163,16 @@ with tab1:
     with col_t1:
         st.markdown("#### 🏆 Top 5 Kategori Produk Berdasarkan Pendapatan")
         fig, ax = plt.subplots(figsize=(8, 5))
-        # Highlight top 1 with deep blue, others with lighter shade
         colors = ['#1E3A8A' if i == 0 else '#60A5FA' for i in range(len(top5_rev))]
         bars = ax.barh(top5_rev['product_category_name_english'], top5_rev['total_revenue'], color=colors)
         ax.invert_yaxis()
         ax.set_xlabel("Total Pendapatan (BRL - R$)")
         ax.set_title("5 Kategori Produk dengan Pendapatan Tertinggi", fontsize=12, fontweight='bold', pad=10)
         
-        # Add labels
+        max_val = top5_rev['total_revenue'].max() if not top5_rev.empty else 1
         for bar in bars:
             width = bar.get_width()
-            ax.text(width + (top5_rev['total_revenue'].max() * 0.02), bar.get_y() + bar.get_height()/2,
+            ax.text(width + (max_val * 0.02), bar.get_y() + bar.get_height()/2,
                     f"R$ {width:,.0f}", ha='left', va='center', fontsize=9, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -168,7 +182,6 @@ with tab1:
     with col_t2:
         st.markdown("#### ⚠️ Bottom 5 Kategori Produk Berdasarkan Pendapatan")
         fig, ax = plt.subplots(figsize=(8, 5))
-        # Highlight lowest with dark red, others with muted red
         colors = ['#991B1B' if i == 0 else '#F87171' for i in range(len(bottom5_rev))]
         bars = ax.barh(bottom5_rev['product_category_name_english'], bottom5_rev['total_revenue'], color=colors)
         ax.invert_yaxis()
@@ -204,7 +217,8 @@ with tab2:
         
         fig, ax = plt.subplots(figsize=(7, 4.8))
         palette = ['#EF4444', '#F97316', '#FBBF24', '#34D399', '#059669']
-        bars = ax.bar(score_counts.index.astype(str), score_counts.values, color=palette, edgecolor='black', linewidth=0.5)
+        bar_colors = palette[:len(score_counts)] if len(score_counts) <= len(palette) else palette
+        bars = ax.bar(score_counts.index.astype(str), score_counts.values, color=bar_colors, edgecolor='black', linewidth=0.5)
         ax.set_xlabel("Skor Ulasan (Bintang)")
         ax.set_ylabel("Jumlah Pesanan")
         ax.set_title("Distribusi Rating Pelanggan (1 - 5)", fontsize=12, fontweight='bold', pad=10)
@@ -264,38 +278,40 @@ with tab3:
     
     rfm_df.columns = ['customer_unique_id', 'Recency', 'Frequency', 'Monetary']
     
-    # Define simple segment based on Recency & Monetary
-    r_labels = [4, 3, 2, 1]  # Lower recency = better
-    m_labels = [1, 2, 3, 4]  # Higher monetary = better
-    
-    # Using quantiles with duplicate handling
-    try:
-        rfm_df['R_Score'] = pd.qcut(rfm_df['Recency'], q=4, labels=r_labels)
-        rfm_df['M_Score'] = pd.qcut(rfm_df['Monetary'], q=4, labels=m_labels)
-    except Exception:
-        rfm_df['R_Score'] = 2
-        rfm_df['M_Score'] = 2
-        
-    def categorize_segment(row):
-        score = int(row['R_Score']) + int(row['M_Score'])
-        if score >= 7:
-            return 'Champions'
-        elif score >= 5:
-            return 'Loyal / High Potential'
-        elif score >= 3:
-            return 'At Risk'
-        else:
-            return 'Hibernating / Lost'
-            
-    rfm_df['Customer_Segment'] = rfm_df.apply(categorize_segment, axis=1)
+    # Robust vectorized segment calculation
+    if not rfm_df.empty:
+        try:
+            rfm_df['R_Score'] = pd.qcut(rfm_df['Recency'], q=4, labels=[4, 3, 2, 1], duplicates='drop').astype(int)
+        except Exception:
+            rfm_df['R_Score'] = 2
+
+        try:
+            rfm_df['M_Score'] = pd.qcut(rfm_df['Monetary'], q=4, labels=[1, 2, 3, 4], duplicates='drop').astype(int)
+        except Exception:
+            rfm_df['M_Score'] = 2
+
+        total_score = rfm_df['R_Score'] + rfm_df['M_Score']
+        conditions = [
+            total_score >= 7,
+            total_score >= 5,
+            total_score >= 3
+        ]
+        choices = [
+            'Champions',
+            'Loyal / High Potential',
+            'At Risk'
+        ]
+        rfm_df['Customer_Segment'] = np.select(conditions, choices, default='Hibernating / Lost')
+    else:
+        rfm_df['Customer_Segment'] = pd.Series(dtype='object')
     
     rfm_col1, rfm_col2, rfm_col3 = st.columns(3)
     with rfm_col1:
-        st.metric("Rata-rata Recency", f"{rfm_df['Recency'].mean():.0f} Hari")
+        st.metric("Rata-rata Recency", f"{rfm_df['Recency'].mean():.0f} Hari" if not rfm_df.empty else "0 Hari")
     with rfm_col2:
-        st.metric("Rata-rata Frekuensi", f"{rfm_df['Frequency'].mean():.2f} Order")
+        st.metric("Rata-rata Frekuensi", f"{rfm_df['Frequency'].mean():.2f} Order" if not rfm_df.empty else "0 Order")
     with rfm_col3:
-        st.metric("Rata-rata Pengeluaran (Monetary)", f"R$ {rfm_df['Monetary'].mean():.2f}")
+        st.metric("Rata-rata Pengeluaran (Monetary)", f"R$ {rfm_df['Monetary'].mean():.2f}" if not rfm_df.empty else "R$ 0.00")
         
     col_rfm1, col_rfm2 = st.columns(2)
     with col_rfm1:
@@ -308,9 +324,10 @@ with tab3:
         ax.set_title("Proporsi Segmen Pelanggan Berdasarkan RFM Score", fontsize=11, fontweight='bold', pad=10)
         plt.xticks(rotation=15)
         
+        max_seg = segment_counts.max() if not segment_counts.empty else 1
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + (segment_counts.max()*0.02),
+            ax.text(bar.get_x() + bar.get_width()/2, height + (max_seg*0.02),
                     f"{height:,}", ha='center', va='bottom', fontsize=9, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -356,9 +373,10 @@ with tab4:
         bars = ax.bar(state_orders.index, state_orders.values, color='#3B82F6', edgecolor='black', linewidth=0.5)
         ax.set_ylabel("Jumlah Pesanan Unik")
         ax.set_title("10 Negara Bagian Teratas Berdasarkan Volume Order", fontsize=11, fontweight='bold', pad=10)
+        max_state = state_orders.max() if not state_orders.empty else 1
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + (state_orders.max()*0.02),
+            ax.text(bar.get_x() + bar.get_width()/2, height + (max_state*0.02),
                     f"{height:,}", ha='center', va='bottom', fontsize=8, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -372,9 +390,10 @@ with tab4:
         bars = ax.bar(payment_dist.index.str.replace('_', ' ').str.title(), payment_dist.values, color='#8B5CF6', edgecolor='black', linewidth=0.5)
         ax.set_ylabel("Jumlah Pesanan")
         ax.set_title("Distribusi Metode Pembayaran Utama", fontsize=11, fontweight='bold', pad=10)
+        max_pay = payment_dist.max() if not payment_dist.empty else 1
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + (payment_dist.max()*0.02),
+            ax.text(bar.get_x() + bar.get_width()/2, height + (max_pay*0.02),
                     f"{height:,}", ha='center', va='bottom', fontsize=8, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
