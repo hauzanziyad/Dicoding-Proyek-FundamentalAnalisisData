@@ -1,0 +1,21 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter & Matplotlib temp
+.ipynb_checkpoints/
+.ipython/
+.matplotlib/
+
+# Submission archives (large files)
+*.zip
+
+# Raw dataset if not needed in repo root (dashboard uses dashboard/main_data.csv)
+E-Commerce Public Dataset/
