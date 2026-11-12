@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime as dt
+from pathlib import Path
 
 # Set page configuration
 st.set_page_config(
@@ -36,13 +37,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Cache data loading
+# Cache data loading using dynamic path based on __file__
 @st.cache_data
 def load_data():
-    df = pd.read_csv("dashboard/main_data.csv")
+    current_dir = Path(__file__).resolve().parent
+    data_file = current_dir / "main_data.csv"
+    if not data_file.exists():
+        data_file = current_dir.parent / "dashboard" / "main_data.csv"
+    if not data_file.exists():
+        data_file = Path("dashboard/main_data.csv")
+        
+    df = pd.read_csv(data_file)
     df['order_purchase_timestamp'] = pd.to_datetime(df['order_purchase_timestamp'])
     df['order_delivered_customer_date'] = pd.to_datetime(df['order_delivered_customer_date'])
     df['order_estimated_delivery_date'] = pd.to_datetime(df['order_estimated_delivery_date'])
+    
+    # Standardize delivery status labels to Indonesian
+    df['delivery_status'] = np.where(df['delivery_status'].isin(['Late', 'Terlambat']), 'Terlambat', 'Tepat Waktu')
     return df
 
 df_raw = load_data()
@@ -68,31 +79,34 @@ with st.sidebar:
         max_value=max_date
     )
     
+    # Safe handling of range selection to prevent blank screen
     if isinstance(date_range, (tuple, list)):
         if len(date_range) == 2:
             start_date, end_date = date_range
         elif len(date_range) == 1:
-            st.info("ℹ️ Silakan tentukan tanggal akhir (end date) pada kalender untuk menyelesaikan filter.")
-            st.stop()
+            start_date = date_range[0]
+            end_date = default_end
+            st.info("ℹ️ Sedang memilih rentang tanggal. Menampilkan data sementara dari tanggal yang dipilih hingga akhir periode.")
         else:
             start_date, end_date = default_start, default_end
     else:
         start_date, end_date = default_start, default_end
         
     if start_date > end_date:
-        st.error("⚠️ Tanggal awal tidak boleh lebih besar dari tanggal akhir.")
-        st.stop()
+        start_date, end_date = end_date, start_date
     
-    # State Filter
+    # State Filter - Default to Top 5 States by transaction volume
+    top_states = df_raw['customer_state'].value_counts().head(5).index.tolist()
     all_states = sorted(df_raw['customer_state'].dropna().unique())
     selected_states = st.multiselect(
         "Filter Negara Bagian (State):",
         options=all_states,
-        default=all_states[:5]  # Top states by default or user choice
+        default=top_states
     )
     
     if not selected_states:
         selected_states = all_states
+        st.info("ℹ️ Tidak ada negara bagian yang dipilih. Menampilkan data untuk seluruh negara bagian secara default.")
         
     st.markdown("---")
     st.markdown("**Dicoding Final Project Submission**")
@@ -121,7 +135,7 @@ total_orders = filtered_df['order_id'].nunique()
 total_revenue = filtered_df['price'].sum()
 avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
 avg_review = filtered_df['review_score'].mean()
-on_time_rate = (filtered_df['delivery_status'] == 'On-Time / Early').mean() * 100 if len(filtered_df) > 0 else 0
+on_time_rate = (filtered_df['delivery_status'] == 'Tepat Waktu').mean() * 100 if len(filtered_df) > 0 else 0
 
 with col1:
     st.metric("Total Pesanan", f"{total_orders:,}")
@@ -146,7 +160,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # ----------------- TAB 1: KINERJA KATEGORI PRODUK -----------------
 with tab1:
-    st.subheader("Performa Kategori Produk: Pendapatan & Volume Terjual")
+    st.subheader("Performa Kategori Produk: Pendapatan dan Volume Terjual")
     st.write("Analisis ini menjawab pertanyaan mengenai kategori produk yang menghasilkan pendapatan tertinggi (Top Performing) dan terendah (Bottom Performing).")
     
     cat_summary = filtered_df.groupby('product_category_name_english').agg(
@@ -170,6 +184,9 @@ with tab1:
         ax.set_title("5 Kategori Produk dengan Pendapatan Tertinggi", fontsize=12, fontweight='bold', pad=10)
         
         max_val = top5_rev['total_revenue'].max() if not top5_rev.empty else 1
+        ax.set_xlim(0, max_val * 1.30)
+        ax.ticklabel_format(style='plain', axis='x')
+        
         for bar in bars:
             width = bar.get_width()
             ax.text(width + (max_val * 0.02), bar.get_y() + bar.get_height()/2,
@@ -188,9 +205,13 @@ with tab1:
         ax.set_xlabel("Total Pendapatan (BRL - R$)")
         ax.set_title("5 Kategori Produk dengan Pendapatan Terendah", fontsize=12, fontweight='bold', pad=10)
         
+        max_bot = bottom5_rev['total_revenue'].max() if not bottom5_rev.empty else 1
+        ax.set_xlim(0, max_bot * 1.35)
+        ax.ticklabel_format(style='plain', axis='x')
+        
         for bar in bars:
             width = bar.get_width()
-            ax.text(width + 20, bar.get_y() + bar.get_height()/2,
+            ax.text(width + (max_bot * 0.02), bar.get_y() + bar.get_height()/2,
                     f"R$ {width:,.2f}", ha='left', va='center', fontsize=9, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -201,7 +222,7 @@ with tab1:
         st.markdown("""
         - **Kategori Unggulan**: Kategori seperti `health_beauty`, `watches_gifts`, dan `bed_bath_table` secara konsisten menjadi motor penggerak pendapatan utama dengan kontribusi jutaan Real.
         - **Kategori Bawah**: Kategori `security_and_services`, `fashion_childrens_clothes`, dan `cds_dvds_musicals` membukukan penjualan yang sangat rendah, mengindikasikan rendahnya minat beli atau minimnya katalog/seller pada segmen tersebut.
-        - **Action Item**: Optimalkan inventaris dan promo berbayar untuk 5 kategori teratas, serta lakukan evaluasi kurasi produk atau renegosiasi kemitraan merchant pada kategori bawah.
+        - **Action Item**: Optimalkan inventaris dan promosi terarah untuk 5 kategori teratas, serta lakukan evaluasi kurasi produk atau renegosiasi kemitraan merchant pada kategori bawah.
         """)
 
 # ----------------- TAB 2: KEPUASAN & KETEPATAN PENGIRIMAN -----------------
@@ -224,10 +245,12 @@ with tab2:
         ax.set_title("Distribusi Rating Pelanggan (1 - 5)", fontsize=12, fontweight='bold', pad=10)
         
         total_rev_orders = score_counts.sum()
+        max_rev = score_counts.max() if not score_counts.empty else 1
+        ax.set_ylim(0, max_rev * 1.15)
         for bar in bars:
             height = bar.get_height()
             pct = (height / total_rev_orders) * 100 if total_rev_orders > 0 else 0
-            ax.text(bar.get_x() + bar.get_width()/2, height + (score_counts.max()*0.02),
+            ax.text(bar.get_x() + bar.get_width()/2, height + (max_rev * 0.02),
                     f"{height:,}\n({pct:.1f}%)", ha='center', va='bottom', fontsize=8.5, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -235,11 +258,11 @@ with tab2:
         st.pyplot(fig)
         
     with col_d2:
-        st.markdown("#### ⏱️ Rata-rata Skor: Tepat Waktu vs Terlambat")
+        st.markdown("#### ⏱️ Rata-rata Skor: Perbandingan Pengiriman Tepat Waktu dan Terlambat")
         delivery_score = filtered_df.drop_duplicates('order_id').groupby('delivery_status')['review_score'].agg(['mean', 'count']).reset_index()
         
         fig, ax = plt.subplots(figsize=(7, 4.8))
-        colors_status = ['#EF4444' if status == 'Late' else '#10B981' for status in delivery_score['delivery_status']]
+        colors_status = ['#EF4444' if status == 'Terlambat' else '#10B981' for status in delivery_score['delivery_status']]
         bars = ax.bar(delivery_score['delivery_status'], delivery_score['mean'], color=colors_status, width=0.45, edgecolor='black', linewidth=0.5)
         ax.set_ylim(0, 5.5)
         ax.set_ylabel("Rata-rata Review Score (1 - 5)")
@@ -257,9 +280,9 @@ with tab2:
         
     with st.expander("💡 Insight Bisnis Pengiriman & Kepuasan Pelanggan"):
         st.markdown("""
-        - **Mayoritas Puas**: Secara umum, sekitar 75%+ pelanggan memberikan ulasan positif (bintang 4 dan 5).
-        - **Dampak Keterlambatan Sangat Signifikan**: Pesanan yang tiba tepat waktu mendapatkan rata-rata rating **~4.29**, sementara pesanan yang terlambat anjlok menjadi **~2.57** (penurunan sebesar 1.72 poin atau lebih dari 40%).
-        - **Action Item**: Mengaudit performa logistik mitra ekspedisi, memperbaiki algoritma estimasi waktu pengiriman (ETA) agar lebih realistis, dan mengimplementasikan sistem peringatan dini/kompensasi jika pesanan berpotensi terlambat.
+        - **Mayoritas Puas**: Secara umum, sekitar 79.0% ulasan pelanggan berada pada kategori positif (bintang 4 dan 5).
+        - **Dampak Keterlambatan Sangat Signifikan**: Pesanan yang tiba tepat waktu mendapatkan rata-rata rating **4.30**, sementara pesanan yang terlambat anjlok menjadi **2.57** (penurunan sebesar 1.73 poin atau 40.2%).
+        - **Action Item**: Mengaudit performa logistik mitra ekspedisi, memperbaiki algoritma estimasi waktu pengiriman (ETA) agar lebih realistis, dan mengimplementasikan sistem peringatan dini atau kompensasi jika pesanan berpotensi terlambat.
         """)
 
 # ----------------- TAB 3: RFM ANALYSIS -----------------
@@ -325,9 +348,10 @@ with tab3:
         plt.xticks(rotation=15)
         
         max_seg = segment_counts.max() if not segment_counts.empty else 1
+        ax.set_ylim(0, max_seg * 1.15)
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + (max_seg*0.02),
+            ax.text(bar.get_x() + bar.get_width()/2, height + (max_seg * 0.02),
                     f"{height:,}", ha='center', va='bottom', fontsize=9, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -356,14 +380,14 @@ with tab3:
 
     with st.expander("💡 Insight Strategi RFM"):
         st.markdown("""
-        - **Karakteristik Transaksi**: Mayoritas pelanggan (>95%) melakukan transaksi sekali (one-time buyer).
-        - **Champions & Loyal Customers**: Menghasilkan kontribusi nilai transaksi yang tinggi per kapita. Berikan program loyalitas eksklusif, early access produk baru, dan reward points.
+        - **Karakteristik Transaksi**: Mayoritas pelanggan (97.0%) melakukan transaksi satu kali (one-time buyer).
+        - **Champions & Loyal Customers**: Mencakup 62.5% pelanggan dan menghasilkan kontribusi nilai transaksi yang dominan. Berikan program loyalitas eksklusif, early access produk baru, dan reward points.
         - **At Risk & Hibernating**: Pelanggan yang sudah lama tidak aktif bertransaksi. Terapkan strategi win-back campaign dengan email terpersonalisasi atau kupon diskon pembelian berikutnya.
         """)
 
 # ----------------- TAB 4: DEMOGRAFI GEOGRAFIS -----------------
 with tab4:
-    st.subheader("Distribusi Geografis Transaksi & Pelanggan")
+    st.subheader("Distribusi Geografis Transaksi dan Pelanggan")
     
     col_g1, col_g2 = st.columns(2)
     with col_g1:
@@ -374,9 +398,10 @@ with tab4:
         ax.set_ylabel("Jumlah Pesanan Unik")
         ax.set_title("10 Negara Bagian Teratas Berdasarkan Volume Order", fontsize=11, fontweight='bold', pad=10)
         max_state = state_orders.max() if not state_orders.empty else 1
+        ax.set_ylim(0, max_state * 1.15)
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + (max_state*0.02),
+            ax.text(bar.get_x() + bar.get_width()/2, height + (max_state * 0.02),
                     f"{height:,}", ha='center', va='bottom', fontsize=8, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -391,9 +416,10 @@ with tab4:
         ax.set_ylabel("Jumlah Pesanan")
         ax.set_title("Distribusi Metode Pembayaran Utama", fontsize=11, fontweight='bold', pad=10)
         max_pay = payment_dist.max() if not payment_dist.empty else 1
+        ax.set_ylim(0, max_pay * 1.15)
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + (max_pay*0.02),
+            ax.text(bar.get_x() + bar.get_width()/2, height + (max_pay * 0.02),
                     f"{height:,}", ha='center', va='bottom', fontsize=8, fontweight='semibold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)

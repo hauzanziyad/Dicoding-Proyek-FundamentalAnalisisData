@@ -1,6 +1,10 @@
 # 📊 Proyek Analisis Data: Brazilian E-Commerce (Olist) Public Dataset
 
-Proyek ini merupakan submission akhir untuk kelas **Belajar Fundamental Analisis Data** pada program Dicoding Indonesia. Proyek mencakup seluruh tahapan analisis data secara komprehensif: perumusan pertanyaan bisnis menggunakan kaidah SMART, Data Wrangling (Gathering, Assessing, Cleaning), Exploratory Data Analysis (EDA), Visualisasi Data & Explanatory Analysis, Analisis Lanjutan (RFM Analysis), penarikan kesimpulan & rekomendasi *action items*, serta pembuatan dashboard interaktif menggunakan **Streamlit**.
+- **Nama:** Hauzan Ziyadatul Khoir
+- **Email:** hauzanziyadk@gmail.com
+- **ID Dicoding:** hauzanziyadk
+
+Proyek ini merupakan submission akhir untuk kelas **Belajar Fundamental Analisis Data** pada program Dicoding Indonesia. Proyek mencakup seluruh tahapan analisis data secara komprehensif: perumusan pertanyaan bisnis menggunakan kaidah SMART, Data Wrangling (Gathering, Assessing, Cleaning), Exploratory Data Analysis (EDA), Visualisasi Data dan Explanatory Analysis, Analisis Lanjutan (RFM Analysis), penarikan kesimpulan dan rekomendasi *action items*, serta pembuatan dashboard interaktif menggunakan **Streamlit**.
 
 ---
 
@@ -31,16 +35,16 @@ submission/
 
 ## 🎯 Pertanyaan Bisnis (SMART Framework)
 
-1. **Pertanyaan 1**: *Kategori produk apa saja yang mencatatkan total pendapatan (revenue) tertinggi dan terendah pada platform E-Commerce Olist selama periode 2017 hingga 2018?*
+1. **Pertanyaan 1**: *Kategori produk apa saja yang mencatatkan total pendapatan (revenue) tertinggi dan terendah pada platform E-Commerce Olist selama periode tahun 2017 hingga 2018?*
 2. **Pertanyaan 2**: *Bagaimana tingkat kepuasan pelanggan berdasarkan skor ulasan (review score), dan bagaimana pengaruh keterlambatan pengiriman terhadap penurunan skor kepuasan pelanggan pada periode 2017-2018?*
 3. **Analisis Lanjutan**: *Bagaimana segmentasi pelanggan Olist berdasarkan analisis Recency, Frequency, dan Monetary (RFM) untuk merancang strategi retensi dan penawaran pemasaran yang tepat sasaran?*
 
 ---
 
-## ⚙️ Panduan Menjalankan Proyek & Dashboard
+## ⚙️ Panduan Menjalankan Proyek dan Dashboard
 
 ### 1. Prasyarat Sistem
-Pastikan Python 3.9 atau versi yang lebih baru telah terpasang di komputer Anda.
+Pastikan Python 3.9 sampai dengan 3.11 telah terpasang pada komputer Anda.
 
 ### 2. Menyiapkan Virtual Environment
 
@@ -69,28 +73,29 @@ pip install -r requirements.txt
 ```
 
 ### 4. Menjalankan Dashboard Streamlit
-Jalankan perintah berikut di root folder proyek:
+Jalankan perintah berikut di folder proyek:
 ```bash
 streamlit run dashboard/dashboard.py
 ```
+*(Atau jika berada di dalam folder `dashboard/`, cukup jalankan `streamlit run dashboard.py`).*
 Aplikasi dashboard akan otomatis terbuka pada peramban web (browser) Anda di alamat `http://localhost:8501`.
 
 ---
 
 ## 📈 Ringkasan Temuan Utama
 
-1. **Kategori Produk dengan Performa Tertinggi & Terendah**:
-   - **Top 5 Revenue**: `health_beauty` (R$ 1.23 Juta), `watches_gifts` (R$ 1.16 Juta), `bed_bath_table` (R$ 1.02 Juta), `sports_leisure` (R$ 952.8 Ribu), dan `computers_accessories` (R$ 888.1 Ribu).
+1. **Kategori Produk dengan Performa Tertinggi dan Terendah**:
+   - **Top 5 Revenue**: `health_beauty` (R$ 1,229,557.50), `watches_gifts` (R$ 1,163,465.91), `bed_bath_table` (R$ 1,022,955.77), `sports_leisure` (R$ 952,840.40), dan `computers_accessories` (R$ 888,055.59).
    - **Bottom 5 Revenue**: `security_and_services` (R$ 283.29), `fashion_childrens_clothes` (R$ 519.95), `cds_dvds_musicals` (R$ 730.00), `home_comfort_2` (R$ 760.27), dan `flowers` (R$ 1,110.04).
 
 2. **Dampak Ketepatan Waktu Pengiriman terhadap Kepuasan Pelanggan**:
-   - Rata-rata skor ulasan keseluruhan adalah **4.16 / 5.00**.
-   - Pesanan yang tiba tepat waktu / lebih cepat mendapatkan rata-rata rating **4.29** (median 5.0).
-   - Pesanan yang terlambat anjlok menjadi rata-rata **2.57** (median 2.0). Keterlambatan memicu penurunan rating drastis sebesar **-1.72 poin (-40.2%)**.
+   - Rata-rata skor ulasan agregat adalah **4.16 / 5.00**, dengan **79.0%** ulasan berada pada kategori positif (bintang 5 sebesar 59.3% dan bintang 4 sebesar 19.7%).
+   - Pesanan yang terkirim tepat waktu mendapatkan rata-rata rating **4.30** (dengan 62.5% memberikan rating bintang 5).
+   - Pesanan yang mengalami keterlambatan anjlok menjadi rata-rata **2.57** (dengan 46.1% memberikan rating bintang 1). Terjadi penurunan signifikan sebesar **-1.73 poin (-40.2%)**.
 
 3. **Segmentasi Pelanggan (RFM Analysis)**:
-   - Sebanyak 97% pelanggan saat ini merupakan *one-time buyer* (Frequency = 1), menunjukkan bahwa platform memiliki tantangan retensi yang tinggi.
-   - Segmen *Champions* dan *Loyal Customers* berkontribusi signifikan terhadap nilai belanja, sementara segmen *At Risk* dan *Hibernating* membutuhkan intervensi kampanye re-engagement secara terarah.
+   - Sebanyak 97.0% pelanggan (90,557 dari 93,358 pengguna unik) merupakan pembeli satu kali (*single-order buyer*).
+   - Segmen *Champions* (18.9%) dan *Loyal / High Potential* (43.6%) mencakup **62.5%** dari total pelanggan serta menyumbang lebih dari 72% dari total pengeluaran belanja pada platform.
 
 ---
 
